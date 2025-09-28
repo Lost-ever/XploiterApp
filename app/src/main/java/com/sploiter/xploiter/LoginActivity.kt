@@ -1,7 +1,6 @@
 package com.sploiter.xploiter
 
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -57,24 +56,26 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import com.sploiter.xploiter.ui.theme.ExploiterTheme
 import com.sploiter.xploiter.ui.theme.button
 import com.sploiter.xploiter.ui.theme.pressed
+import com.sploiter.xploiter.utility.User
+import com.sploiter.xploiter.utility.readUser
+import com.sploiter.xploiter.utility.saveUser
+import com.sploiter.xploiter.utility.startactivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-val Context.dataStore by preferencesDataStore("details")
 class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { false }
         setContent {
-            LoginScreen()
+            ExploiterTheme {
+                LoginScreen()
+            }
         }
     }
 }
@@ -209,9 +210,11 @@ fun LoginScreen() {
                         } else {
                             login(context, username, password) { success ->
                                 if (success) {
-                                    val intent = Intent(context, MainActivity::class.java)
-                                    intent.putExtra("username", username)
-                                    context.startActivity(intent)
+                                    startactivity(
+                                        context,
+                                        MainActivity::class.java,
+                                        username = username
+                                    )
                                 }
                                 else {
                                     usernameFocusRequester.requestFocus()
@@ -256,9 +259,11 @@ fun LoginScreen() {
 
                             login(context, username, password) { success ->
                                 if (success) {
-                                    val intent = Intent(context, MainActivity::class.java)
-                                    intent.putExtra("username", username)
-                                    context.startActivity(intent)
+                                    startactivity(
+                                        context,
+                                        MainActivity::class.java,
+                                        username = username
+                                    )
                                 }
                                 else {
                                     usernameFocusRequester.requestFocus()
@@ -285,9 +290,7 @@ fun LoginScreen() {
                         }
                         else {
                             signIn(context, username, password)
-                            val intent = Intent(context, MainActivity::class.java)
-                            intent.putExtra("username", username)
-                            context.startActivity(intent)
+                            startactivity(context, MainActivity::class.java, username = username)
                         }
                     }
                 }
@@ -391,28 +394,27 @@ fun validateInputs(username: String, password: String): Boolean {
     return username.isNotEmpty() && password.isNotEmpty()
 }
 
-suspend fun saveData(context: Context, username: String, password:String){
-    context.dataStore.edit{ prefs ->
-        prefs[stringPreferencesKey(username)] = password
-    }
+fun setUser(context: Context, username: String, password:String){
+    val data = User(username, password)
+    saveUser(context, data)
 }
-suspend fun readData(context: Context, username:String):String?{
-    val prefs = context.dataStore.data.first()
-    return prefs[stringPreferencesKey(username)]
+fun getUser(context: Context, username:String):String?{
+    val json = readUser(context)
+    return if (username == json?.password) json.password else{null}
 
 }
 fun signIn(context: Context, username: String, password: String){
     CoroutineScope(Dispatchers.IO).launch {
-        val storedPassword = readData(context, username)
+        val storedPassword = getUser(context, username)
         if (storedPassword != password){
-            saveData(context, username, password)
+            setUser(context, username, password)
         }
     }
 }
 
 fun login(context:Context, username: String, password: String, onResult: (Boolean) -> Unit){
     CoroutineScope(Dispatchers.IO).launch {
-        val storedPassword = readData(context, username)
+        val storedPassword = getUser(context, username)
         val success = storedPassword == password
 
         CoroutineScope(Dispatchers.Main).launch {
